@@ -16,5 +16,5 @@ html, body {
   justify-content: center;
 }
 
-@media (max-width: 250px) {.vwr-labels{display:none;}}
+@media (max-width: 370px) {.vwr-labels{display:none;}}
 @media (max-width: 360px) {.vwr-t{font-size:30px;}}
