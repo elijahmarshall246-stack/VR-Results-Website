@@ -32,7 +32,7 @@
 
   var events = [], cache = {}, knockoutData = [], _seq = 0;
   var activeType = '__all', activeClass = '__all';
-  var classMap = {}, classList = [];
+  var classMap = {}, classList = [], carNames = {};
 
   function esc(s){ return String(s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
   var cellVal = function(c){ return c ? (c.f!=null ? String(c.f) : (c.v!=null ? String(c.v) : '')) : ''; };
@@ -81,6 +81,7 @@
       HEATS.blocks.forEach(function(b,bi){
         var num=gv(G,r,b.num), drv=gv(G,r,b.driver);
         if(!drv&&!num) return;
+        if(num&&drv&&!carNames[num]) carNames[num]=drv;
         if(!rowsByHeat[bi]) rowsByHeat[bi]={};
         if(!rowsByHeat[bi][curHeat]) rowsByHeat[bi][curHeat]=[];
         rowsByHeat[bi][curHeat].push({num:num, driver:drv, ms:parseTime(gv(G,r,b.time))});
@@ -103,9 +104,10 @@
   function parseFastestClass(G, start, end){
     classMap={}; var order=[];
     for(var r=start;r<end;r++){
-      var cls=gv(G,r,0), drv=gv(G,r,5);
+      var cls=gv(G,r,0), drv=gv(G,r,5), car=gv(G,r,4);
       if(!cls||!drv) continue;
       if(/^class$/i.test(cls)||/^driver(\s*name)?$/i.test(drv)||/^knockouts/i.test(cls)) continue;
+      if(car&&!carNames[car]) carNames[car]=drv;
       classMap[norm(drv)]=cls;
       if(order.indexOf(cls)===-1) order.push(cls);
     }
@@ -114,8 +116,15 @@
   }
   function classOf(driver){ return classMap[norm(driver)]||''; }
 
-  function parseKO(G, O, name){
-    var slot=function(rr,c){ return {car:gv(G,O+rr,c), driver:gv(G,O+rr,c+1), time:gv(G,O+rr,c+2)}; };
+  function parseKO(G, O, name, end){
+    
+    if(end==null) end=G.length;
+    var EMPTY={car:'',driver:'',time:''};
+    var slot=function(rr,c){ var R=O+rr; if(R>=end) return EMPTY;
+      var car=gv(G,R,c), driver=gv(G,R,c+1);
+      // Some events only fill the car # in early rounds; recover the name by car number.
+      if(car&&!driver&&carNames[car]) driver=carNames[car];
+      return {car:car, driver:driver, time:gv(G,R,c+2)}; };
     var rounds={};
     ['R16','QF','SF','F'].forEach(function(rk){
       var col=KO.carCol[rk];
@@ -123,7 +132,8 @@
       var filled=l.filter(function(m){ return m.slot1.car||m.slot1.driver||m.slot2.car||m.slot2.driver; });
       if(filled.length) rounds[rk]=filled;
     });
-    var winnerCar=gv(G, O+KO.winner.row, KO.winner.col);
+    var winnerRow=O+KO.winner.row;
+    var winnerCar=winnerRow<end ? gv(G, winnerRow, KO.winner.col) : '';
     var fm=rounds['F'];
     if(fm&&fm.length){ var f=fm[0];
       if(winnerCar){ f.slot1.winner=f.slot1.car===winnerCar; f.slot2.winner=f.slot2.car===winnerCar; }
@@ -286,11 +296,15 @@
   Array.prototype.forEach.call(el('lbTabs').children, function(b){ b.addEventListener('click',function(){ setView(+b.dataset.view); }); });
 
   function render(G){
+    carNames={};
     var heatsHdr = findRow(G, 0, function(row){ return rowHasExact(row, 'qualifying 1'); });
     var fastTitle = findRow(G, 0, function(row){ return row.some(function(v){ return /^fastest qualifying/i.test(String(v).trim()); }); });
-    var koOrigins=[];
-    for(var r=0;r<G.length;r++){ if(rowHasExact(G[r]||[], 'round of 16')) koOrigins.push(r); }
-    var firstKO = koOrigins.length ? koOrigins[0] : G.length;
+    // Anchor knockout brackets on the "Knockouts X" title row: the bracket grid
+    // always starts on the next row. (Older code keyed on a literal "Round of 16"
+    // cell, which silently hid brackets that omit that header — e.g. the 21 Jun 2021 tab.)
+    var koHeaders=[];
+    for(var r=0;r<G.length;r++){ if(/^knockouts/i.test(String((G[r]||[])[0]||'').trim())) koHeaders.push(r); }
+    var firstKO = koHeaders.length ? koHeaders[0] : G.length;
 
     var heatsEnd = fastTitle>=0 ? fastTitle : firstKO;
     var runs = heatsHdr>=0 ? parseHeats(G, heatsHdr+1, heatsEnd) : [];
@@ -304,9 +318,14 @@
     renderOverall(deriveOverall(runs));
     renderHeats(runs);
 
-    knockoutData = koOrigins.map(function(O,i){ return parseKO(G, O, knockoutName(G,O,i)); });
+    knockoutData = koHeaders
+      .map(function(hr,i){
+        var end = i+1<koHeaders.length ? koHeaders[i+1] : G.length;
+        return parseKO(G, hr+1, knockoutName(G, hr+1, i), end);
+      })
+      .filter(function(c){ return Object.keys(c.rounds).length; });
     buildCatButtons();
-    var anyKO=knockoutData.some(function(c){ return Object.keys(c.rounds).length; });
+    var anyKO=knockoutData.length>0;
     var koTab=el('lbTabs').querySelector('[data-view="1"]');
     if(koTab) koTab.style.display = anyKO ? '' : 'none';
     setCat(0);

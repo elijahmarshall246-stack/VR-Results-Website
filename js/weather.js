@@ -1,6 +1,5 @@
 (function(){
-  // Location/units come from config.js (window.VR_CONFIG.weather); fall back to
-  // the original hardcoded values so the widget still works if config is missing.
+
   var W = (window.VR_CONFIG && window.VR_CONFIG.weather) || {};
   var CFG = {
     label1:   W.label1   || "VAUCLUSE RACEWAY",

@@ -1,27 +1,17 @@
 (function(){
-  // Reuse the events sheet already defined in config.js (window.VR_CONFIG.live.events);
-  // fall back to the original literals so the widget still works if config is missing.
   var EV = (window.VR_CONFIG && window.VR_CONFIG.live && window.VR_CONFIG.live.events) || {};
   var SHEET_ID   = EV.sheetId || "1ghHvvVe4kNnkVUbYTsBHxrfB2MLH-erhOCvlOBbU3Uc";
   var EVENTS_GID = EV.gid     || "1914616841";
   var all = [];
 
-  // ── gviz JSONP read of the events tab (replaces the Apps Script web app).
-  //    gviz doesn't send CORS headers, so we load it as a <script> (JSONP),
-  //    the same transport the live-results page uses. headers=1 makes gviz
-  //    extract the header row as column labels (cols[].label) — reliable even
-  //    for numeric columns like "day", where reading the header cell directly
-  //    would come back null because the text label doesn't fit the number type. ──
+  
   function gvizEvents(cb){
     var base = "https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/gviz/tq?gid="+EVENTS_GID+"&headers=1";
     var cbName = "__erGviz"+Date.now();
     var script = document.createElement("script");
     var done = false;
     function val(cell){ return cell ? (cell.f != null ? cell.f : (cell.v != null ? cell.v : "")) : ""; }
-    // Safety net: if neither the callback nor onerror ever fires (e.g. the
-    // request is blocked by a privacy extension / tracking protection, or the
-    // page isn't being served as a real web page), don't hang on the static
-    // "Loading events…" placeholder forever — surface an actual message.
+  
     var timer = setTimeout(function(){
       if(done) return; done = true;
       delete window[cbName]; script.remove();
@@ -50,7 +40,7 @@
     document.head.appendChild(script);
   }
 
-  // Centered (vertical + horizontal) empty state.
+
   var EMPTY_HTML = '<div style="width:100%;min-height:260px;display:flex;align-items:center;justify-content:center;text-align:center;color:#888;font-size:16px;font-weight:600;font-family:Arial,sans-serif;padding:40px 20px;box-sizing:border-box;">No upcoming events just yet — watch this space.</div>';
 
   var TYPES = {
@@ -71,7 +61,7 @@
     var bannerBg = isSocial ? "#FFB143" : "#1E1E1E";
     return '<div class="er-card" style="width:100%;max-width:100%;box-sizing:border-box;background:'+bannerBg+';border-radius:12px;padding:22px;font-family:Arial,sans-serif;margin-bottom:0;overflow:hidden;">'
 
-      // LIVE + FEATURED badges row
+
       +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">'
         +'<div style="display:inline-flex;align-items:center;gap:8px;background:#CC0000;color:#fff;font-size:14px;font-weight:700;padding:6px 16px;border-radius:99px;letter-spacing:0.08em;text-transform:uppercase;font-family:Arial,sans-serif;">'
           +'<span class="er-live-dot" style="display:inline-block;width:11px;height:11px;border-radius:50%;background:#fff;"></span>'
@@ -80,7 +70,6 @@
         +(isFeatured ? '<span style="display:inline-block;background:#F1592A;color:#fff;font-size:13px;font-weight:700;padding:6px 16px;border-radius:99px;letter-spacing:0.08em;text-transform:uppercase;font-family:Arial,sans-serif;">FEATURED</span>' : '')
       +'</div>'
 
-      // Date + Name + Results button inline (desktop), stacked (mobile)
       +'<div class="er-live-row" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">'
         +'<div style="display:flex;align-items:center;gap:10px;">'
           +'<div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">'

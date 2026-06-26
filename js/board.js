@@ -5,21 +5,14 @@
   const CONFIG = {
     sheetId: '1KmJvICKMVe44DewudUdgdW9AhC_Rif83u6CwELpvZls',
     pollSeconds: 10,
-    // Qualifying TV layout. true  → Overall Fastest + By Heats shown side by side.
-    //                       false → cycle between the two full-screen (like Knockout TV).
-    // Overridden by the "QFTVSidebySide" key in the Settings sheet.
+
     qfTvSideBySide: true,
-    qfTvCycleMs: 12000,   // dwell per view when cycling (matches Knockout TV)
-    // Events + Settings live in a SEPARATE spreadsheet, read via gviz JSONP
-    // (replaces the old Apps Script web app).
+    qfTvCycleMs: 12000,   
     eventsSheetId: '1ghHvvVe4kNnkVUbYTsBHxrfB2MLH-erhOCvlOBbU3Uc',
-    eventsGid:   '1914616841',   // drives the header "LIVE" badge (any row live === "Yes")
-    settingsGid: '1288723697',   // key|value config: Title, Date, ShowWinner, Show <category>
+    eventsGid:   '1914616841',  
+    settingsGid: '1288723697',   
     knockouts: {
-      showWinner: false,   // set to false to hide the Winner column
-      // Cell-reference config: set the car-number cell for each slot.
-      // Driver = same row, +1 column.  Time = same row, +2 columns.
-      // Adjust rows to match your actual sheet. W = winner car-number cell (optional).
+      showWinner: false,  
       categories: [
         { name: 'BimmaCup', gid: '2038855303', fetchRange: 'H7:X37',
           rounds: {
@@ -129,23 +122,22 @@
       ],
     },
 
-    // The HEATS grid is the single source of truth.
-    // The "Overall Fastest" view is computed from it automatically.
+
     heats: {
       gid: '1005565792',
       range: 'B5:Q66',
       runLabels: ['Qualifying 1','Qualifying 2','Qualifying 3'],
-      // Column indexes WITHIN the range (0 = first col of the range):
-      heatCol: 0,                      // the "Heat" number column
-      blocks: [                        // one per qualifying run → [number, driver, time] columns
+    
+      heatCol: 0,                      
+      blocks: [                     
         { num: 2, driver: 3, time: 4 },
         { num: 7, driver: 8, time: 9 },
         { num: 12, driver: 13, time: 14 },
       ],
-      entriesPerHeat: 2,               // drivers paired per heat
+      entriesPerHeat: 2,              
     },
   };
-  const SENTINEL_MS = 30*60000;        // times >= 30:00 treated as "no time set"
+  const SENTINEL_MS = 30*60000;   
 
   /* ===== TIME HELPERS ===== */
   function parseTime(v){
@@ -166,7 +158,7 @@
   function fmtGap(ms){ const s=Math.floor(ms/1000), mm=ms%1000; return '+'+s+'.'+String(mm).padStart(3,'0'); }
 
   /* ===== STATE ===== */
-  let _gvizSeq=0;  // unique counter for JSONP callback names
+  let _gvizSeq=0; 
   let activeView=0, lastChange=Date.now(), lastDataStr='', tvOn=false;
   let prevPos={}, prevOverallMs={}, prevHeatMs={};
   const el=id=>document.getElementById(id), root=el('lb'), list=el('lbList'), grid=el('lbHeatGrid');
@@ -195,7 +187,7 @@
 
   /* ===== RENDER OVERALL (with FLIP) ===== */
   function renderOverall(rows){
-    list.style.zoom=''; // reset zoom so FLIP measurements are at 1:1 scale
+    list.style.zoom=''; 
     const first={}; [...list.children].forEach(r=> first[r.dataset.id]=r.getBoundingClientRect().top);
     const leaderMs=rows[0]?.ms ?? null;
     list.innerHTML='';
@@ -262,7 +254,7 @@
     else { const m=Math.floor(s/60), r=s%60; txt='updated '+m+'m'+(r?' '+r+'s':'')+' ago'; }
     el('lbUpdatedTxt').textContent=txt; },1000);
 
-  /* ===== LIVE: read heats grid via JSONP (works from file:// and cross-origin) ===== */
+  /* ===== LIVE ===== */
   function loadLive(cb){
     const h=CONFIG.heats;
     const base=`https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}/gviz/tq?gid=${h.gid}`+(h.range?`&range=${h.range}`:'');
@@ -299,9 +291,8 @@
     document.head.appendChild(script);
   }
 
-  /* ===== EVENTS / SETTINGS SHEET (separate spreadsheet, gviz JSONP) ===== */
-  /* Generic row reader for the events+settings spreadsheet. headers=0 so row 0
-     is returned as data; cb(rows) on success, cb(null) on any failure. */
+  /* ===== EVENTS / SETTINGS SHEET  ===== */
+ 
   function gvizRows(gid, cb){
     const base=`https://docs.google.com/spreadsheets/d/${CONFIG.eventsSheetId}/gviz/tq?gid=${gid}&headers=0`;
     const cbName='__gvizCfg'+(++_gvizSeq);
@@ -314,9 +305,7 @@
   }
   const cellVal=c=>c?(c.f!=null?c.f:(c.v!=null?String(c.v):'')):'';
 
-  /* ===== LIVE BADGE: a RallySprint event row with live === "Yes" =====
-     Only RallySprint events drive the badge — a live Social/Speed/etc. row
-     (e.g. "RB26 Practice") must NOT light it up. */
+
   function loadLiveStatus(){
     gvizRows(CONFIG.eventsGid, rows=>{
       if(!rows){ el('lbLive').style.display='none'; el('lbUpdated').style.display='none'; return; }
@@ -333,7 +322,6 @@
     });
   }
 
-  /* ===== SETTINGS: key|value rows → normalized map, then applied to CONFIG/DOM ===== */
   function loadSettings(cb){
     gvizRows(CONFIG.settingsGid, rows=>{
       const out={};
@@ -350,9 +338,7 @@
     if(s.date){ const d=el('lbDate'); if(d) d.textContent=s.date; }
     if('showwinner' in s) CONFIG.knockouts.showWinner=truthy(s.showwinner);
     if('qftvsidebyside' in s) CONFIG.qfTvSideBySide=truthy(s.qftvsidebyside);
-    // Category visibility: keep a category only if its "Show <name>" key is truthy
-    // (or absent, defaulting to shown). Filtering the source array keeps the
-    // buttons, bracket data and TV cycling all in sync.
+
     CONFIG.knockouts.categories=CONFIG.knockouts.categories.filter(cat=>{
       const key='show'+cat.name.toLowerCase().replace(/[^a-z0-9]/g,'');
       return (key in s)?truthy(s[key]):true;
@@ -362,9 +348,11 @@
   /* ===== ORCHESTRATION ===== */
   function cycle(isInit){
     const done=runs=>{
-      const str=JSON.stringify(runs.map(r=>r.heats.map(h=>h.entries.map(e=>e.ms))));
+      const str=JSON.stringify(runs.map(r=>r.heats.map(h=>h.entries.map(e=>[e.num,e.driver,e.ms]))));
       const changed=str!==lastDataStr; lastDataStr=str;
-      renderHeats(runs); renderOverall(deriveOverall(runs));
+      // Only re-render when the data actually changed — otherwise the 10s poll
+      // rebuilds the list every time and re-triggers the row animation ("jump").
+      if(changed||isInit){ renderHeats(runs); renderOverall(deriveOverall(runs)); }
       hideLoading();
       if(!isInit) markUpdated(true,changed);
     };
@@ -374,10 +362,7 @@
     setInterval(()=>{ cycle(false); loadLiveStatus(); }, CONFIG.pollSeconds*1000); }
 
   /* ===== TV "OVERALL FASTEST" AUTO-FIT =====
-     Keeps the Overall list clear of the credit footer.
-     - Side-by-side TV mode: the list lives in a narrow column, so shrink-to-fit (zoom).
-     - Solo/cycling mode: when the single column would reach the footer, split it into
-       enough side-by-side columns that everything fits above the footer (no zoom). */
+      */
   function scaleTvList(){
     list.style.zoom='';
     list.classList.remove('tvcols');
@@ -386,14 +371,13 @@
     if(!tvOn) return;
     requestAnimationFrame(()=>{
       const listRect=list.getBoundingClientRect();
-      // Cap against the credit footer's actual top edge (the header height varies,
-      // so a fixed estimate would let the list run under the footer).
+ 
       const credit=root.querySelector('.lb__credit');
       const limitBottom=credit?credit.getBoundingClientRect().top-8
                               :el('lbViews').getBoundingClientRect().bottom-4;
       const availH=limitBottom-listRect.top;
       const listH=list.scrollHeight;
-      if(!(listH>availH&&availH>0)) return;   // fits above the footer — nothing to do
+      if(!(listH>availH&&availH>0)) return;  
       if(root.classList.contains('tvsolo')){
         const cols=Math.max(2, Math.ceil(listH/availH));
         list.style.setProperty('--tvcols', cols);
@@ -409,8 +393,7 @@
   let tvHideTimer=null, tvQfCat=0, tvQfInterval=null;
   const tvExit=el('lbTvExit');
   function showTvExit(){ tvExit?.classList.add('show'); clearTimeout(tvHideTimer); tvHideTimer=setTimeout(()=>tvExit?.classList.remove('show'),3000); }
-  /* When QFTVSidebySide is off, show one qualifying view at a time (0=Overall, 1=Heats)
-     and crossfade between them — mirrors the Knockout TV category cycling. */
+
   function setTvQf(i){ tvQfCat=i;
     el('lbOverall').classList.toggle('qf-hidden', i!==0);
     el('lbHeats').classList.toggle('qf-hidden', i!==1);
@@ -430,8 +413,7 @@
     showTvExit(); requestAnimationFrame(scaleTvList); if(root.requestFullscreen) root.requestFullscreen().catch(()=>{}); }
   function exitTV(keepFs){ tvOn=false; root.classList.remove('tv'); stopQfCycle(); list.style.zoom=''; clearTimeout(tvHideTimer); tvExit?.classList.remove('show'); if(!keepFs && document.fullscreenElement) document.exitFullscreen().catch(()=>{}); }
   document.addEventListener('mousemove',()=>{ if(tvOn||ktvOn) showTvExit(); });
-  // Website (regular) build: TV buttons are removed from the HTML, so wire them
-  // only if present. The TV/fullscreen functions stay but are simply unreachable.
+
   { const b=el('lbTvBtn'); if(b) b.onclick=enterTV; }
   if(tvExit) tvExit.onclick=()=>{ exitTV(); exitKnockoutTV(); };
   /* Enter toggles between Qualifying TV and Knockout TV without leaving fullscreen */
@@ -469,7 +451,7 @@
     document.head.appendChild(script);
   }
 
-  /* --- One fetch per category covering the entire bracket range --- */
+
   function loadOneKnockoutTab(catCfg, cb){
     const ROUND_KEYS=['R16','QF','SF','F'];
     if(!catCfg.fetchRange){ cb({name:catCfg.name, rounds:{}}); return; }
@@ -521,14 +503,13 @@
     });
   }
 
-  /* --- load all categories in parallel --- */
   function loadKnockouts(cb){
     const cats=CONFIG.knockouts.categories; const results=new Array(cats.length).fill(null); let remaining=cats.length;
     cats.forEach((catCfg,i)=>{ loadOneKnockoutTab(catCfg, data=>{ results[i]=data;
       if(--remaining===0) cb(results.every(r=>r===null)?null:results); }); });
   }
 
-  /* --- build one slot element --- */
+
   function makeSlot(slot, adv){
     const isBye=slot.car==='Bye'||slot.driver==='Bye'||(!slot.driver&&(slot.car===''||slot.car==='?'));
     const isTbd=!slot.driver&&!isBye;
@@ -540,7 +521,7 @@
     return `<div class="${cls}"><span class="lb__bnum">${carDisp}</span><span class="lb__bname">${nameDisp}</span>${advBadge}<span class="lb__bfill"></span>${timeDisp}</div>`;
   }
 
-  /* --- render bracket for one category --- */
+
   function renderBracket(catData){
     const bracket=el('lbBracket');
     if(!catData){ bracket.innerHTML='<div style="padding:20px;color:var(--muted);font-family:var(--font-mono);font-size:12px;">No data yet — ensure the sheet is published and has rows in A:Round B:Match C:Car1 D:Driver1 E:Time1 F:Car2 G:Driver2 H:Time2 I:Winner format.</div>'; return; }
@@ -589,13 +570,13 @@
     bracket.innerHTML=html;
   }
 
-  /* --- category button wiring --- */
+ 
   function setCat(i){
     activeCat=i;
     [...el('lbKcatBtns').children].forEach(b=>b.classList.toggle('active',+b.dataset.cat===i));
     if(knockoutData) renderBracket(knockoutData[i]);
   }
-  /* Build the category buttons from the (settings-filtered) CONFIG list. */
+
   function buildCatButtons(){
     const wrap=el('lbKcatBtns');
     wrap.innerHTML=CONFIG.knockouts.categories.map((cat,i)=>
@@ -603,7 +584,6 @@
     [...wrap.children].forEach(b=>b.onclick=()=>setCat(+b.dataset.cat));
   }
 
-  /* --- knockout polling cycle --- */
   function knockoutCycle(){
     loadKnockouts(cats=>{
       if(!cats) return;
@@ -621,7 +601,7 @@
     setInterval(knockoutCycle, CONFIG.pollSeconds*1000);
   }
 
-  /* --- knockout TV mode --- */
+
   function setKtvCat(i){
     const label=el('lbKtvLabel');
     label.style.opacity='0';
@@ -657,9 +637,9 @@
 
   /* ===== BOOT: load settings first, apply, then start everything ===== */
   function boot(){
-    buildCatButtons();   // built from the (possibly filtered) category list
-    start();             // qualifying cycle + live badge + polling
-    startKnockouts();    // knockout cycle + polling
+    buildCatButtons();   
+    start();
+    startKnockouts();
   }
   loadSettings(s=>{ applySettings(s); boot(); });
 })();
